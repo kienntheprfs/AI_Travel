@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   headText: {
     color:'black',
     fontFamily:'nunito-bold',
-    fontSize:'20'
+    fontSize: 20
   },
   accordionItem: {
     marginTop:'8%',

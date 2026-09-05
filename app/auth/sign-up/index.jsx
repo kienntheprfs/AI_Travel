@@ -5,6 +5,9 @@ import { styles } from '../../../styles/SignUp_style';
 import { auth } from '../../../configs/FireBaseConfig';
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from 'expo-router'
+import { db } from '../../../configs/FireBaseConfig';
+import { doc, setDoc } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SignUp() {
 
@@ -25,13 +28,12 @@ export default function SignUp() {
   const [email, setEmail] = useState();
   const [password, setPassword] = useState();
   const [fullName, setFullName] = useState();
-  const [loginName, setLoginName] = useState();
 
   const router = useRouter();
 
-  const OnCreateAccount = () => {
+  const OnCreateAccount = async () => {
     // Check if all fields are filled
-    if (!email || !password || !fullName || !loginName) {
+    if (!email || !password || !fullName) {
       Alert.alert("Vui lòng nhập đầy đủ thông tin");
       return;
     }
@@ -49,19 +51,29 @@ export default function SignUp() {
       return;
     }
   
-    // Create account using Firebase
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        // Signed up
-        const user = userCredential.user;
-        router.replace('/home');
-      })
-      .catch((error) => {
-        const errorCode = error.code;
-        const errorMessage = error.message;
-        Alert.alert("Đăng ký thất bại", errorMessage);
+    try {
+      // Create account using Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+  
+      // Save user information to Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        fullName,
+        email,
+        birthDate: date.toISOString(), // Save date as ISO string for consistency
+        createdAt: new Date().toISOString(),
       });
-    };
+  
+      // Save session to AsyncStorage
+      await AsyncStorage.setItem('userSession', JSON.stringify({ uid: user.uid, email: user.email }));
+  
+      Alert.alert("Đăng ký thành công", "Tài khoản của bạn đã được tạo!");
+      router.replace('/home');
+    } catch (error) {
+      const errorMessage = error.message;
+      Alert.alert("Đăng ký thất bại", errorMessage);
+    }
+  };
   
   return (
     <ImageBackground source={require('../../../assets/images/Login_Page.jpg')} style={styles.SignUpPageBackGround}>
@@ -90,8 +102,6 @@ export default function SignUp() {
               </View>
             )}
 
-            <TextInput style={styles.SignUpTextInput} placeholder="Tên đăng nhập:" placeholderTextColor={'black'} onChangeText={(value) => setLoginName(value)}/>
-
             <TextInput style={styles.SignUpTextInput} placeholder="Mật khẩu:" placeholderTextColor={'black'} secureTextEntry={true} onChangeText={(value) => setPassword(value)}/>
           </View>
 
@@ -99,7 +109,7 @@ export default function SignUp() {
             <Text style = {styles.SignUpButtonText}>Lưu</Text>
           </TouchableOpacity>
 
-          <Text style = {styles.SignUpBoxGoogleText}>or continue with</Text>
+          <Text style = {styles.SignUpBoxGoogleText}>hoặc Tiếp tục với</Text>
 
           <TouchableOpacity style = {styles.SignUpGoogleButton}>
             <Image source={require('../../../assets/images/Google_Icon.png')}/>

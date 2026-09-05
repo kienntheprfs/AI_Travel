@@ -94,6 +94,7 @@ export const styles = StyleSheet.create({
     color: Colors.DARK_GREEN,
     marginLeft: '5%',
     paddingVertical: '2%',
+    marginTop:'5%'
   },
   viewAllText: {
     fontFamily: 'nunito',

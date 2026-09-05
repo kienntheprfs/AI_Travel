@@ -57,56 +57,56 @@ export default function Loading() {
   }, [Destination, days, nights, MinBugget, MaxBugget, WhoTravel, userEmail]);
 
   const generateAiTrip = async () => {
-    // if (!userEmail) {
-    //   console.error("User email not available. Cannot generate trip.");
-    //   return;
-    // }
+    if (!userEmail) {
+      console.error("User email not available. Cannot generate trip.");
+      return;
+    }
 
-    // setLoading(true);
-    // const FINAL_PROMPT = AI_PROMPT
-    //   .replace('{Destination}', Destination)
-    //   .replace('{days}', days)
-    //   .replace('{nights}', nights)
-    //   .replace('{MinBugget}', MinBugget)
-    //   .replace('{MaxBugget}', MaxBugget)
-    //   .replace('{WhoTravel}', WhoTravel);
+    setLoading(true);
+    const FINAL_PROMPT = AI_PROMPT
+      .replace('{Destination}', Destination)
+      .replace('{days}', days)
+      .replace('{nights}', nights)
+      .replace('{MinBugget}', MinBugget)
+      .replace('{MaxBugget}', MaxBugget)
+      .replace('{WhoTravel}', WhoTravel);
 
-    // console.log(FINAL_PROMPT);
+    console.log(FINAL_PROMPT);
 
-    // try {
-    //   const result = await chatSession.sendMessage(FINAL_PROMPT);
-    //   const tripResponse = JSON.parse(result.response.text());
+    try {
+      const result = await chatSession.sendMessage(FINAL_PROMPT);
+      const tripResponse = JSON.parse(result.response.text());
 
-    //   const docId = Date.now().toString();
-    //   await setDoc(doc(db, "UserTrips", docId), {
-    //     userEmail,
-    //     tripData: tripResponse,
-    //     WhoTravel: WhoTravel,
-    //     StartDate: StartDate,
-    //     EndDate: EndDate,
-    //     MinBugget: MinBugget,
-    //     MaxBugget: MaxBugget,
-    //     Destination: Destination,
-    //     ID: docId
-    //   });
+      const docId = Date.now().toString();
+      await setDoc(doc(db, "UserTrips", docId), {
+        userEmail,
+        tripData: tripResponse,
+        WhoTravel: WhoTravel,
+        StartDate: StartDate,
+        EndDate: EndDate,
+        MinBugget: MinBugget,
+        MaxBugget: MaxBugget,
+        Destination: Destination,
+        ID: docId
+      });
 
-    //   await AsyncStorage.setItem('UsingDocId', docId); // Dùng sau
+      await AsyncStorage.setItem('UsingDocId', docId); // Dùng sau
 
-    //   console.log("Trip data stored successfully.");
-    //   router.push({
-    //     pathname: '/tourStart',
-    //     params: {docIdForEdit: docId}
-    //   })
-    // } catch (error) {
-    //   console.error("Error storing trip data:", error);
-    // } finally {
-    //   setLoading(false);
-    // }
+      console.log("Trip data stored successfully.");
+      router.push({
+        pathname: '/tourStart',
+        params: {docIdForEdit: docId}
+      })
+    } catch (error) {
+      console.error("Error storing trip data:", error);
+    } finally {
+      setLoading(false);
+    }
 
-    router.push({
-      pathname: '/tourStart',
-      params: {docIdForEdit: 1736083677326}
-    })
+    // router.push({
+    //   pathname: '/tourStart',
+    //   params: {docIdForEdit: docId}
+    // })
   };
 
   return (

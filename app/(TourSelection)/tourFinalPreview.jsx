@@ -340,6 +340,11 @@ export default function TourFinalPreview() {
           );
         })}
       
+      <View style={styles.button2Container}>
+        <TouchableOpacity style={styles.returnHome} onPress={() => router.replace('/home')}>
+          <Ionicons name="home-outline" size={24} color="black" />
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -348,6 +353,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFE68A',
+    paddingBottom:'10%'
   },
   reviewSchedule: {
     marginHorizontal: '3%',
@@ -404,6 +410,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#A1D59963',
     overflow: 'hidden',
     elevation: 2,
+    marginBottom:'2%'
   },
   header: {
     padding: 12,
@@ -487,5 +494,18 @@ const styles = StyleSheet.create({
     fontFamily: 'nunito',
     height: 25,
     fontSize: 13
-  }
+  },
+
+  button2Container: {
+    alignSelf:'center',
+    marginVertical:'2%',
+    paddingBottom: '5%'
+  },
+
+  returnHome: {
+    marginRight: '4%',
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 99,
+  },
 });

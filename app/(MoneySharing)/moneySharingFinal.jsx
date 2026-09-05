@@ -1,15 +1,52 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, ScrollView } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { query, collection, where, getDocs } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { db } from '../../configs/FireBaseConfig';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Feather from '@expo/vector-icons/Feather';
+
+const GAP = Dimensions.get('window').width - 300;
+const FRAMEGAP = Dimensions.get('window').width - 315;
 
 export default function MoneySharingFinal() {
   const router = useRouter();
   const { updatedCategories } = useLocalSearchParams();
   const [parsedCategories, setParsedCategories] = useState([]);
   const [totalPayments, setTotalPayments] = useState({});
+
+  // Check session and fetch user name when the component mounts
+  const [userName, setUserName] = useState('');
+  useEffect(() => {
+    const checkSession = async () => {
+      const user = await AsyncStorage.getItem('userSession');
+      if (user) {
+        const userData = JSON.parse(user);
+        fetchUserName(userData.email); // Fetch user's name
+      }
+    };
+    checkSession();
+  }, []);
+
+  // Fetch the user name from Firestore based on the email
+  const fetchUserName = async (email) => {
+    try {
+      const usersQuery = query(collection(db, 'users'), where('email', '==', email));
+      const querySnapshot = await getDocs(usersQuery);
+      
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0]; // Get the first matching document
+        const userData = userDoc.data();
+        setUserName(userData.fullName || ''); // Use fullName or fallback to an empty string
+      } else {
+        console.warn('No matching user document found');
+      }
+    } catch (error) {
+      console.error('Error fetching user name: ', error);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -85,17 +122,13 @@ export default function MoneySharingFinal() {
   }, [parsedCategories]);
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity style={styles.returnButton} onPress={() => router.back()}>
-        <Ionicons name="chevron-back" size={24} color="black" />
-      </TouchableOpacity>
-
+    <ScrollView style={styles.container}>
       <View style={styles.firstHeaderContainer}>
         <View style={styles.userNameBox}>
           <View style={styles.imageBox}>
             <Image source={require('../../assets/images/character.png')} style={styles.userImage} />
           </View>
-          <Text style={styles.userName}>Doan Le Vy</Text>
+          <Text style={styles.userName}>{userName}</Text>
         </View>
 
         <View style={styles.notificationButton}>
@@ -107,9 +140,9 @@ export default function MoneySharingFinal() {
 
       <View style={styles.table}>
         <View style={styles.tableHeader}>
-          <Text style={styles.tableHeaderCell}>Activities</Text>
-          <Text style={styles.tableHeaderCell}>Value</Text>
-          <Text style={styles.tableHeaderCell}>Details</Text>
+          <Text style={styles.tableHeaderCell}>Tên mục</Text>
+          <Text style={styles.tableHeaderCell}>Số tiền</Text>
+          <Text style={styles.tableHeaderCell}>Nội dung</Text>
         </View>
 
         {parsedCategories.map((category, index) => {
@@ -125,95 +158,167 @@ export default function MoneySharingFinal() {
               <Text style={styles.tableCell}>{category.name}</Text>
               <Text style={styles.tableCell}>{category.value}</Text>
               <Text style={styles.tableCell}>
-                Mỗi người tham gia trả: {perParticipantCost}, mỗi người ứng: {perPayerContribution}
+                Mỗi người tham gia trả: {perParticipantCost}{'\n'}Mỗi người ứng: {perPayerContribution}
               </Text>
             </View>
           );
         })}
 
         <Text style={styles.total}>
-          Total:{' '}
+          <Text style={styles.totalBold}>Tổng kết:</Text>{'\n'}
           {Object.entries(totalPayments).map(([key, value]) => {
             const [from, to] = key.split('->');
+            const formattedValue = Math.abs(value).toLocaleString(); // Format the number with commas
+
             if (value < 0) {
               // Reverse the transaction
               return (
                 <Text key={key}>
-                  {to} needs to pay {from} {Math.abs(value).toFixed(0)}{'\n'}
+                  <Text style={styles.totalBold}>{to}</Text> cần trả cho{' '}
+                  <Text style={styles.totalBold}>{from}</Text> {formattedValue}{'\n'}
                 </Text>
               );
             }
             return (
               <Text key={key}>
-                {from} needs to pay {to} {value.toFixed(0)}{'\n'}
+                <Text style={styles.totalBold}>{from}</Text> cần trả cho{' '}
+                <Text style={styles.totalBold}>{to}</Text> {formattedValue}{'\n'}
               </Text>
             );
           })}
         </Text>
       </View>
-    </View>
+      
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.returnButton} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color="black" />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.button2Container}>
+        <TouchableOpacity style={styles.returnHome} onPress={() => router.replace('/home')}>
+          <Ionicons name="home-outline" size={24} color="black" />
+        </TouchableOpacity>
+      </View>
+      
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-  },
-  returnButton: {
-    marginBottom: 20,
+    backgroundColor: '#D3EC9E',
   },
   firstHeaderContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    gap: GAP,
+    marginTop: '15%',
+    flexDirection:'row',
   },
   userNameBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingLeft: 5,
+    paddingRight: 30,
+    paddingVertical: 5,
+    borderRadius: 40,
+    marginLeft: '5%',
+    flexDirection:'row',
+    width: 200,
   },
   imageBox: {
-    marginRight: 10,
-  },
-  userImage: {
-    width: 50,
+    backgroundColor: 'pink', 
+    borderRadius: 99,
     height: 50,
-    borderRadius: 25,
+  },
+  userImage : {
+    top: -30,
+    width: 50, 
+    height: 75,
   },
   userName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    marginTop: 16,
+    marginLeft: 10,
+    fontFamily: 'nunito-bold',
+    textAlign:'center'
   },
+
   notificationButton: {
-    padding: 10,
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 99,
   },
+
   firstTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    marginTop: 20,
+    marginLeft: 20,
+    fontSize: 24,
+    fontFamily: 'nunito-bold',
+    color: '#0A6138'
   },
   table: {
     marginTop: 20,
+    marginHorizontal: 20,
+    borderRadius: 10,  // Optional: Add rounded corners to the table
+    padding: 10,  // Optional: Add padding inside the table
+    backgroundColor: '#E9EFDC',
+    shadowColor: '#000',  // Shadow color
+    shadowOffset: { width: 0, height: 4 },  
+    shadowOpacity: 0.25, 
+    shadowRadius: 6, 
   },
   tableHeader: {
     flexDirection: 'row',
-    marginBottom: 10,
+    borderBottomWidth: 1,  // Border between header and rows
+    borderColor: '#0A6138',  // Set border color (black)
+    backgroundColor:'#FFE68A',
+    borderWidth:1
   },
   tableHeaderCell: {
     flex: 1,
     fontWeight: 'bold',
+    padding: 10,  // Optional: Add padding for better spacing
   },
   tableRow: {
     flexDirection: 'row',
-    marginBottom: 10,
+    borderBottomWidth: 1,  // Border between rows
+    borderColor: '#0A6138',  // Set border color (black)
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
   },
   tableCell: {
     flex: 1,
+    fontFamily: 'nunito',
+    padding: 10,  // Optional: Add padding for better spacing
   },
   total: {
     marginTop: 20,
-    fontWeight: 'bold',
+    fontFamily: 'nunito',
     fontSize: 16,
+    marginLeft: '5%',
   },
+  totalBold: {
+    fontFamily: 'nunito-bold',
+    color: '#0A6138'
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    marginTop: '5%'
+  },
+  returnHome: {
+    marginRight: '4%',
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 99,
+  },
+  returnButton: {
+    marginLeft: '5%',
+    marginRight: '62%',
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 99,
+  },
+
+  button2Container: {
+    alignSelf:'center',
+    marginVertical:'56%',
+  }
 });

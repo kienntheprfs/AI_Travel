@@ -332,6 +332,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     marginLeft: '72%',
     marginRight: '10%',
+    marginBottom: '5%',
     marginTop: '2%',
     width:85,
     height:30,

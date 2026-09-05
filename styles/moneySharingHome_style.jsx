@@ -62,7 +62,7 @@ export const styles = StyleSheet.create({
     bodyText: {
       marginVertical: '4%',
       marginLeft: 20,
-      marginRight:'1%',
+      marginRight:'10%',
       fontSize: 12,
       fontFamily: 'nunito-bold',
       color: '#0A6138',

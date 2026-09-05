@@ -1,22 +1,35 @@
-import { View, Text, Image, TouchableOpacity, ScrollView, TouchableHighlight, TextInput, Alert, TouchableWithoutFeedback, Keyboard, RefreshControl } from 'react-native'; // Thêm RefreshControl
+import { View, Text, Image, TouchableOpacity, ScrollView, TouchableHighlight, TextInput, Alert, TouchableWithoutFeedback, Keyboard, RefreshControl } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { Colors } from '../../constants/Colors';
 import Feather from '@expo/vector-icons/Feather';
 import { styles } from '../../styles/mytrip_style';
-
-import * as Clipboard from 'expo-clipboard'; // Import thư viện Clipboard
+import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { collection, getDocs, query, where, doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { db } from '../../configs/FireBaseConfig';
 
-function ResultDropDown({ visible, onClose, tour, onJoinTour }) {
+// Function to get photo reference from Google Places API
+const GetPhotoRef = async (PlaceName) => {
+  try {
+    const resp = await fetch(
+      `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${PlaceName}&key=${process.env.EXPO_PUBLIC_PHOTO_GOOGLE_API_KEY}`
+    );
+    const result = await resp.json();
+    return result?.results[0]?.photos[0]?.photo_reference;
+  } catch (error) {
+    console.error("Error fetching photo reference:", error);
+    return null;
+  }
+};
+
+function ResultDropDown({ visible, onClose, tour, onJoinTour, tourOwnerName }) {
   if (!visible || !tour) return null;
 
   return (
     <View style={styles.searchResultDropdown}>
       <Text style={styles.searchResultTitle}>
-        Du lịch {tour.Destination} tạo bởi {tour.userName}
+        Du lịch {tour.Destination} tạo bởi {tourOwnerName}
       </Text>
       <View style={styles.searchResultDateAndJoinButton}>
         <Text style={styles.searchResultDate}>
@@ -32,28 +45,48 @@ function ResultDropDown({ visible, onClose, tour, onJoinTour }) {
 
 export default function MyTrip() {
   const router = useRouter();
-  const [showCodePopup, setShowCodePopup] = useState(null); // State để lưu trữ ID của card đang hiển thị popup
-  const [tours, setTours] = useState([]); // State để lưu trữ dữ liệu tour
-  const [showResultDropDown, setShowResultDropDown] = useState(false); // State để quản lý việc hiển thị ResultDropDown
-  const [searchText, setSearchText] = useState(''); // State để lưu trữ giá trị nhập vào ô tìm kiếm
-  const [searchResult, setSearchResult] = useState(null); // State để lưu trữ kết quả tìm kiếm
-  const [currentUserEmail, setCurrentUserEmail] = useState(''); // State để lưu trữ email của người dùng hiện tại
-  const [refreshing, setRefreshing] = useState(false); // State để quản lý trạng thái refresh
+  const [showCodePopup, setShowCodePopup] = useState(null);
+  const [tours, setTours] = useState([]);
+  const [showResultDropDown, setShowResultDropDown] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [tourImages, setTourImages] = useState({}); // To store fetched images by tour ID
+  const [tourOwnerName, setTourOwnerName] = useState('')
 
-  // Hàm lấy email người dùng hiện tại để tham gia tour du lịch
   useEffect(() => {
     const checkSession = async () => {
       const user = await AsyncStorage.getItem('userSession');
       if (user) {
         const userData = JSON.parse(user);
         setCurrentUserEmail(userData.email);
-        fetchTours(userData.email); // Gọi hàm fetchTours với email của người dùng
+        fetchUserName(userData.email);
+        fetchTours(userData.email);
       }
     };
     checkSession();
   }, []);
 
-  // Hàm sao chép mã code vào clipboard
+  const fetchUserName = async (email) => {
+    try {
+      const usersQuery = query(collection(db, 'users'), where('email', '==', email));
+      const querySnapshot = await getDocs(usersQuery);
+      
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        setUserName(userData.fullName || '');
+      } else {
+        console.warn('No matching user document found');
+      }
+    } catch (error) {
+      console.error('Error fetching user name: ', error);
+    }
+  };
+
+    // Hàm sao chép mã code vào clipboard
   const copyToClipboard = async (code) => {
     try {
       await Clipboard.setStringAsync(code); // Sao chép mã code vào clipboard
@@ -64,71 +97,100 @@ export default function MyTrip() {
     }
   };
 
-  // Hàm để lấy dữ liệu từ Firebase
   const fetchTours = async (userEmail) => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'UserTrips')); // 'UserTrips' là tên collection trong Firestore
+      const querySnapshot = await getDocs(collection(db, 'UserTrips'));
       const toursData = [];
       querySnapshot.forEach((doc) => {
         const tourData = doc.data();
-        // Kiểm tra xem người dùng hiện tại có trong mảng participants không
+        if (tourData.userEmail === userEmail) {
+          toursData.push({ id: doc.id, ...tourData });
+        }
+
         if (tourData.participants && tourData.participants.includes(userEmail)) {
-          toursData.push({ id: doc.id, ...tourData }); // Lấy dữ liệu và thêm vào mảng
+          toursData.push({ id: doc.id, ...tourData });
         }
       });
-      setTours(toursData); // Cập nhật state với dữ liệu mới
+      setTours(toursData);
+
+      // Fetch images for each tour
+      for (let tour of toursData) {
+        const imageRef = await GetPhotoRef(tour.Destination);
+        if (imageRef) {
+          const imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${imageRef}&key=${process.env.EXPO_PUBLIC_PHOTO_GOOGLE_API_KEY}`;
+          setTourImages((prevImages) => ({ ...prevImages, [tour.id]: imageUrl }));
+        }
+      }
+
     } catch (error) {
       console.error('Error fetching tours: ', error);
     } finally {
-      setRefreshing(false); // Dừng hiệu ứng refresh sau khi hoàn thành
+      setRefreshing(false);
     }
   };
 
-  // Hàm xử lý khi người dùng kéo xuống để refresh
   const onRefresh = async () => {
-    setRefreshing(true); // Bắt đầu hiệu ứng refresh
-    await fetchTours(currentUserEmail); // Gọi lại hàm fetchTours để cập nhật dữ liệu
+    setRefreshing(true);
+    await fetchTours(currentUserEmail);
   };
 
-  // Hàm tìm kiếm tour bằng ID
+  const fetchSearchTourUserName = async (email) => {
+    try {
+      const usersQuery = query(collection(db, 'users'), where('email', '==', email));
+      const querySnapshot = await getDocs(usersQuery);
+      
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        setTourOwnerName(() => userData.fullName || '');
+      } else {
+        console.warn('No matching user document found');
+      }
+    } catch (error) {
+      console.error('Error fetching user name: ', error);
+    }
+  };
+
   const searchTourById = async (id) => {
     try {
-      const docRef = doc(db, 'UserTrips', id); // Tham chiếu đến document có ID tương ứng
-      const docSnap = await getDoc(docRef); // Lấy dữ liệu từ document
-
+      const docRef = doc(db, 'UserTrips', id);
+      const docSnap = await getDoc(docRef);
+      
       if (docSnap.exists()) {
-        setSearchResult({ id: docSnap.id, ...docSnap.data() }); // Lưu kết quả tìm kiếm vào state
-        setShowResultDropDown(true); // Hiển thị dropdown
+        const tourData = docSnap.data();
+        setSearchResult({ id: docSnap.id, ...tourData });
+  
+        // Fetch the owner's name before showing the dropdown
+        await fetchSearchTourUserName(tourData.userEmail); // Đảm bảo fetch hoàn thành trước khi hiển thị dropdown
+        setShowResultDropDown(true);
       } else {
-        Alert.alert('Không tìm thấy', 'Không có tour nào với ID này.'); // Hiển thị thông báo nếu không tìm thấy
-        setSearchResult(null); // Đặt kết quả tìm kiếm về null
-        setShowResultDropDown(false); // Ẩn dropdown
+        Alert.alert('Không tìm thấy', 'Không có tour nào với ID này.');
+        setSearchResult(null);
+        setShowResultDropDown(false);
       }
     } catch (error) {
       console.error('Lỗi khi tìm kiếm tour: ', error);
-      Alert.alert('Lỗi', 'Đã xảy ra lỗi khi tìm kiếm tour.'); // Hiển thị thông báo lỗi
+      Alert.alert('Lỗi', 'Đã xảy ra lỗi khi tìm kiếm tour.');
     }
   };
 
-  // Hàm xử lý tham gia tour
   const handleJoinTour = async (tourId) => {
     try {
-      const tourRef = doc(db, 'UserTrips', tourId); // Tham chiếu đến document của tour
+      const tourRef = doc(db, 'UserTrips', tourId);
       await updateDoc(tourRef, {
-        participants: arrayUnion(currentUserEmail), // Thêm email của người dùng hiện tại vào mảng participants
+        participants: arrayUnion(currentUserEmail),
       });
       Alert.alert('Thành công', 'Bạn đã tham gia tour thành công!');
-      setShowResultDropDown(false); // Ẩn dropdown sau khi tham gia
-      fetchTours(currentUserEmail); // Cập nhật lại danh sách tour
+      setShowResultDropDown(false);
+      fetchTours(currentUserEmail);
     } catch (error) {
       console.error('Lỗi khi tham gia tour: ', error);
-      Alert.alert('Lỗi', 'Đã xảy ra lỗi khi tham gia tour.'); // Hiển thị thông báo lỗi
+      Alert.alert('Lỗi', 'Đã xảy ra lỗi khi tham gia tour.');
     }
   };
 
-  // Hàm xử lý sự kiện scroll
   const handleScroll = () => {
-    setShowResultDropDown(false); // Ẩn ResultDropDown khi cuộn
+    setShowResultDropDown(false);
   };
 
   return (
@@ -140,7 +202,7 @@ export default function MyTrip() {
               <View style={styles.imageBox}>
                 <Image source={require('../../assets/images/character.png')} style={styles.userImage} />
               </View>
-              <Text style={styles.userName}>Doan Le Vy </Text>
+              <Text style={styles.userName}>{userName || 'Guest'}</Text>
             </View>
 
             <View style={styles.searchContainer}>
@@ -151,9 +213,9 @@ export default function MyTrip() {
                   placeholder="Nhập tour được chia sẻ"
                   placeholderTextColor="#7D848D"
                   value={searchText}
-                  onChangeText={(text) => setSearchText(text)} // Cập nhật giá trị nhập vào
+                  onChangeText={(text) => setSearchText(text)}
                   onFocus={() => setShowResultDropDown(true)}
-                  onSubmitEditing={() => searchTourById(searchText)} // Gọi hàm tìm kiếm khi nhấn Enter
+                  onSubmitEditing={() => searchTourById(searchText)}
                 />
               </View>
 
@@ -161,7 +223,8 @@ export default function MyTrip() {
                 visible={showResultDropDown} 
                 onClose={() => setShowResultDropDown(false)} 
                 tour={searchResult} 
-                onJoinTour={handleJoinTour} // Truyền hàm handleJoinTour vào ResultDropDown
+                onJoinTour={handleJoinTour}
+                tourOwnerName={tourOwnerName}
               />
             </View>
           </View>
@@ -172,20 +235,30 @@ export default function MyTrip() {
           <ScrollView 
             style={styles.tourScrollView} 
             showsVerticalScrollIndicator={false}
-            onScroll={handleScroll} // Thêm sự kiện onScroll
-            scrollEventThrottle={16} // Đảm bảo sự kiện scroll được gọi thường xuyên
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             refreshControl={
               <RefreshControl
-                refreshing={refreshing} // Trạng thái refresh
-                onRefresh={onRefresh} // Hàm xử lý khi refresh
-                colors={[Colors.DARK_GREEN]} // Màu của hiệu ứng refresh
-                tintColor={Colors.DARK_GREEN} // Màu của icon refresh
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[Colors.DARK_GREEN]}
+                tintColor={Colors.DARK_GREEN}
               />
             }
           >
             {tours.map(tour => (
-              <TouchableOpacity key={tour.id} style={styles.tourCard} onPress={() => router.push({ pathname: '/tourStart', params: { docIdForEdit: tour.id } })}>
-                <Image source={{ uri: tour.tripData.places_to_visit[0].image_url }} style={styles.tourImage} />
+              <TouchableOpacity 
+                key={tour.id} style={styles.tourCard} 
+                onPress={() => 
+                  router.push({ 
+                    pathname: '/tourFinalPreview', 
+                    params: { docId: tour.id } })
+                }
+              >
+                <Image 
+                  source={{ uri: tourImages[tour.id] }} 
+                  style={styles.tourImage} 
+                />
                 
                 <View style={styles.tourInfo}>
                   <Text style={styles.tourDestination}>{tour.Destination}</Text>

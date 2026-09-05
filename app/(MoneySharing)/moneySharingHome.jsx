@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, Image, TextInput, Alert, FlatList, ScrollView} from 'react-native';
-import React, { useState} from 'react';
+import React, { useState, useEffect} from 'react';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { styles } from '../../styles/moneySharingHome_style';
 
@@ -8,9 +9,41 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Feather from '@expo/vector-icons/Feather';
 import Entypo from '@expo/vector-icons/Entypo';
 
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../../configs/FireBaseConfig';
+
 export default function MoneySharing() {
   const router = useRouter();
   const [participants, setParticipants] = useState([]);
+  const [userName, setUserName] = useState(''); // State to store user's name
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const user = await AsyncStorage.getItem('userSession');
+      if (user) {
+        const userData = JSON.parse(user);
+        fetchUserName(userData.email); // Fetch user's name
+      }
+    };
+    checkSession();
+  }, []);
+
+  const fetchUserName = async (email) => {
+    try {
+      const usersQuery = query(collection(db, 'users'), where('email', '==', email));
+      const querySnapshot = await getDocs(usersQuery);
+      
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0]; // Get the first matching document
+        const userData = userDoc.data();
+        setUserName(userData.fullName || ''); // Use fullName or fallback to an empty string
+      } else {
+        console.warn('No matching user document found');
+      }
+    } catch (error) {
+      console.error('Error fetching user name: ', error);
+    }
+  };
 
   const getRandomPastelColor = () => {
     const randomColor = () => Math.floor(Math.random() * 64 + 180);
@@ -55,7 +88,7 @@ export default function MoneySharing() {
             <View style={styles.imageBox}>
               <Image source={require('../../assets/images/character.png')} style={styles.userImage} />
             </View>
-            <Text style={styles.userName}>Doan Le Vy</Text>
+            <Text style={styles.userName}>{userName}</Text>
           </View>
 
           <View style={styles.notificationButton}>

@@ -95,7 +95,7 @@ export default function SignIn() {
           <Text style={styles.SignInButtonText}>Đăng nhập</Text>
         </TouchableOpacity>
 
-        <Text style={styles.SignInBoxGoogleText}>or continue with</Text>
+        <Text style={styles.SignInBoxGoogleText}>hoặc Tiếp tục với</Text>
 
         <TouchableOpacity style={styles.SignInGoogleButton}>
           <Image source={require('../../../assets/images/Google_Icon.png')} />

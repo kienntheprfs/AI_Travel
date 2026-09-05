@@ -1,10 +1,15 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList, ScrollView, Dimensions } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import {styles} from '../../styles/moneySharingTable_style';
+import { Colors } from '../../constants/Colors'
+import { query, collection, where, getDocs } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { db } from '../../configs/FireBaseConfig';
 
 import Feather from '@expo/vector-icons/Feather';
 import AntDesign from '@expo/vector-icons/AntDesign';
+
+const GAP = Dimensions.get('window').width - 300;
 
 export default function MoneySharingTable() {
   const router = useRouter();
@@ -34,6 +39,37 @@ export default function MoneySharingTable() {
       payers: [],
     }))
   );
+
+  // Check session and fetch user name when the component mounts
+  const [userName, setUserName] = useState('');
+  useEffect(() => {
+    const checkSession = async () => {
+      const user = await AsyncStorage.getItem('userSession');
+      if (user) {
+        const userData = JSON.parse(user);
+        fetchUserName(userData.email); // Fetch user's name
+      }
+    };
+    checkSession();
+  }, []);
+
+  // Fetch the user name from Firestore based on the email
+  const fetchUserName = async (email) => {
+    try {
+      const usersQuery = query(collection(db, 'users'), where('email', '==', email));
+      const querySnapshot = await getDocs(usersQuery);
+      
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0]; // Get the first matching document
+        const userData = userDoc.data();
+        setUserName(userData.fullName || ''); // Use fullName or fallback to an empty string
+      } else {
+        console.warn('No matching user document found');
+      }
+    } catch (error) {
+      console.error('Error fetching user name: ', error);
+    }
+  };
 
   const toggleParticipantSelection = (categoryIndex, key, person) => {
     // Update selectedParticipants
@@ -87,7 +123,7 @@ export default function MoneySharingTable() {
                       : styles.unselectedParticipant
                   }
                 >
-                  <Text style={styles.tableContentText}>{person.name}</Text>
+                  <Text style={[styles.tableContentText, {backgroundColor: person.color}]}>{person.name}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -125,7 +161,7 @@ export default function MoneySharingTable() {
                   style={styles.userImage}
                 />
               </View>
-              <Text style={styles.userName}>Doan Le Vy</Text>
+              <Text style={styles.userName}>{userName}</Text>
             </View>
             <View style={styles.notificationButton}>
               <Feather name="bell" size={30} color="black" />
@@ -162,5 +198,206 @@ export default function MoneySharingTable() {
   );
 }
 
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.PASTEL_GREEN,
+  },
+ 
+  firstHeaderContainer: {
+    gap: GAP,
+    marginTop: '15%',
+    flexDirection:'row',
+    
+  },
+  userNameBox: {
+    backgroundColor: 'white',
+    paddingLeft: 5,
+    paddingRight: 30,
+    paddingVertical: 5,
+    borderRadius: 40,
+    marginLeft: '5%',
+    flexDirection:'row',
+    width: 200,
+  },
+  imageBox: {
+    backgroundColor: 'pink', 
+    borderRadius: 99,
+    height: 50,
+  },
+  userImage : {
+    top: -30,
+    width: 50, 
+    height: 75,
+  },
 
+  userName: {
+    marginTop: 16,
+    marginLeft: 10,
+    fontFamily: 'nunito-bold',
+    textAlign:'center'
+  },
 
+  notificationButton: {
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 99,
+  },
+
+  firstTitle: {
+    marginTop: 20,
+    marginLeft: 20,
+    fontSize: 24,
+    fontFamily: 'nunito-bold',
+    color: '#0A6138'
+  },
+
+  tableFrame: {
+    backgroundColor: '#EBF7D4',
+    borderRadius:10,
+    width: 370,
+    marginVertical:'5%',
+    shadowColor: '#000',  // Shadow color
+    shadowOffset: { width: 0, height: 4 },  
+    shadowOpacity: 0.25, 
+    shadowRadius: 6,   
+    justifyContent: 'center',  // Centers vertically
+    alignSelf:'center',
+    paddingBottom:'4%'
+  },
+
+  tableHeader: {
+    flexDirection:'row',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFE68A',
+    borderBlockColor:'#0A6138',
+    borderWidth:1, 
+    marginTop:'4%',
+    marginHorizontal:'2%',
+  },
+
+  tableHeaderText1: {
+    fontFamily: 'nunito-bold',
+    fontSize: 10,
+    color:'#0A6138',
+    width:60,
+    paddingRight:'2%',
+    textAlign:'center'
+  },
+
+  tableHeaderText2: {
+    fontFamily: 'nunito-bold',
+    fontSize: 10,
+    color:'#0A6138',
+    width:95,
+    textAlign:'center',
+    marginLeft:'6%'
+  },
+
+  tableContent: {
+    flexDirection:'row',
+    padding: 10,
+    borderBlockColor:'#0A6138', 
+    borderBottomWidth:1,
+    borderRightWidth:1,
+    borderLeftWidth:1,
+    marginHorizontal:'2%',
+    backgroundColor:'#EBF7D4',
+    shadowColor: '#000',  // Shadow color
+    shadowOffset: { width: 0, height: 4 },  
+    shadowOpacity: 0.25, 
+    shadowRadius: 6, 
+  },
+
+  tableContentText: {
+    fontFamily: 'nunito-medium',
+    fontSize: 10,
+    color:'#000000',
+    width:55,
+    marginRight:'2%',
+    marginVertical: '5%',
+    alignSelf:'center',
+    textAlign:'center',
+    borderRadius: 20,
+  },
+
+  collapsibleContainer: {
+    flex: 1,
+    marginVertical: 4, 
+  },
+  
+  collapsibleIcon: {
+    marginLeft: '5%', 
+    width: 68,
+    paddingLeft:'90%',
+  },
+
+  participantBox: {
+    marginTop: 8, 
+    backgroundColor: '#A1D599', 
+    borderRadius: 6, 
+    width:62,
+    marginRight:'8%',
+    alignSelf:'flex-end',
+  },
+  
+  returnButton: {
+    backgroundColor: '#FFE68A',
+    marginLeft: '12%',
+    width: 75,
+    height:30,
+    borderRadius: 16,
+    borderWidth:0.5,
+    borderColor:'#DCD7D7',
+    shadowColor: '#000',  // Shadow color
+    shadowOffset: { width: 0, height: 2},  
+    shadowOpacity: 0.5, 
+    marginTop: '5%'
+  },
+    
+  Footer: {
+    flexDirection:'row'
+  },
+
+  nextButton: {
+    backgroundColor: '#FFE68A',
+    marginLeft: '42%',
+    width: 75,
+    height:30,
+    borderRadius: 16,
+    borderWidth:0.5,
+    borderColor:'#DCD7D7',
+    shadowColor: '#000',  // Shadow color
+    shadowOffset: { width: 0, height: 2},  
+    shadowOpacity: 0.5, 
+    marginTop: '5%'
+  },
+
+  nextButtonText: {
+    color: '#0A6138',
+    fontSize: 10,
+    fontFamily: 'nunito-bold',
+    textAlign:'center',
+    paddingVertical:'10%'
+  },
+
+  nameBox: {
+    fontSize: 12,
+    fontFamily: 'nunito-bold',
+    marginVertical: 5,
+    marginLeft: '15%',
+    textAlign:'center',
+    padding: 5,
+    borderRadius: 99
+  },
+  selectedNamesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  nameBoxText: {
+    fontFamily: 'nunito',
+    fontSize: 10
+  }
+
+});

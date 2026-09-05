@@ -4,7 +4,7 @@ import { Colors } from '../constants/Colors'
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.AVOCADO_GREEN,
+    backgroundColor: '#ACD9A5',
   },
   returnButton: {
     position: 'absolute',
